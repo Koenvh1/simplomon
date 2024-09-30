@@ -182,6 +182,9 @@ DNSSOAChecker::DNSSOAChecker(sol::table data) : Checker(data, 2)
 
 CheckResult DNSSOAChecker::perform()
 {
+  d_results.clear();
+  d_results[d_domain.toString()]["soa"] = "";
+
   map<string, set<string>> harvest;
   for(const auto& s: d_servers) {
     DNSMessageWriter dmw(d_domain, DNSType::SOA);
@@ -234,6 +237,11 @@ CheckResult DNSSOAChecker::perform()
                             s.toStringWithPort(), d_domain.toString());
     }
   }
+
+  if(harvest.size() >= 1) {
+    d_results[d_domain.toString()]["soa"] = fmt::format("{}", harvest.begin()->first);
+  }
+
   if(harvest.size() != 1) {
     return fmt::format("Had different SOA records for {}: {}",
                        d_domain.toString(), harvest);
