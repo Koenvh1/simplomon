@@ -2,9 +2,12 @@
 #include "simplomon.hh"
 #include "sol/sol.hpp"
 #include <fmt/chrono.h>
+#include "dkjson.hh"
 using namespace std;
 
 sol::state g_lua;
+std::mutex g_lualock;
+
 int g_intervalSeconds=60;
 int g_maxWorkers = 16;
 
@@ -85,7 +88,7 @@ private:
 
 void initLua()
 {
-  g_lua.open_libraries(sol::lib::base, sol::lib::package);
+  g_lua.open_libraries(sol::lib::base, sol::lib::package, sol::lib::math, sol::lib::string, sol::lib::table, sol::lib::os);
 
   g_lua.set_function("dailyChime", [&](sol::table data) {
     g_checkers.emplace_back(make_unique<DailyChimeChecker>(data));
@@ -197,4 +200,6 @@ void initLua()
     return make_shared<TelegramNotifier>(data);
   });
 
+
+  g_lua["json"]=g_lua.script(dkjson);
 }

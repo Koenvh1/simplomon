@@ -77,8 +77,8 @@ index_html_h = custom_target(
     command : [prog_xxd, '-i', '@INPUT@', '@OUTPUT@'],
 )
 
-style_css_h = custom_target(
-    'style_css.h', output : 'style_css.h',  input : 'html/style.css',  
+pico_css_h = custom_target(
+    'pico_css.h', output : 'pico_css.h',  input : 'html/pico.min.css',  
     command : [prog_xxd, '-i', '@INPUT@', '@OUTPUT@'],
 )
 
@@ -98,7 +98,7 @@ logic_js_h = custom_target(
 )
 
 
-webpages = [logic_js_h, alpine_min_js_h, simplomon_ico_h, style_css_h, index_html_h]
+webpages = [logic_js_h, alpine_min_js_h, simplomon_ico_h, pico_css_h, index_html_h]
 
 executable('simplomon', 'simplomon.cc', 'notifiers.cc', 'minicurl.cc', 'dnsmon.cc', 'record-types.cc', 'dnsmessages.cc', 'dns-storage.cc', 'netmon.cc', 'luabridge.cc', 'webservice.cc', 'support.cc', 'promon.cc', 'mailmon.cc', 'nonblocker.cc',
 webpages,

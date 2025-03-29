@@ -6,7 +6,7 @@
 #include <openssl/evp.h>
 
 #include "index_html.h"
-#include "style_css.h"
+#include "pico_css.h"
 #include "logic_js.h"
 #include "alpine_min_js.h"
 #include "simplomon_ico.h"
@@ -75,10 +75,11 @@ void updateWebService()
         jreasons[r.first].push_back(res);
     }
 
-    
+    cstate["name"] = c->d_name;
     cstate["attr"] = jattr;
     cstate["results"] = jresults;
     cstate["reasons"] = jreasons;
+    cstate["description"] = c->getDescription();
     s_checkerstates[c->getCheckerName()].push_back(cstate);
   }
 }
@@ -207,22 +208,25 @@ void startWebService(sol::table data)
     res.set_content(s_checkerstates.dump(), "application/json");
   });
 
-  svr->Get("/simplomon.ico", [](const auto& req, auto& res) {
-    res.set_content(string((const char*)___html_simplomon_ico, ___html_simplomon_ico_len), "image/x-icon");
-  });
-  svr->Get("/alpine.min.js", [](const auto& req, auto& res) {
-    res.set_content(string((const char*)___html_alpine_min_js, ___html_alpine_min_js_len), "application/javascript");
-  });
-  svr->Get("/logic.js", [](const auto& req, auto& res) {
-    res.set_content(string((const char*)___html_logic_js, ___html_logic_js_len), "application/javascript");
-  });
-  svr->Get("/style.css", [](const auto& req, auto& res) {
-    res.set_content(string((const char*)___html_style_css, ___html_style_css_len), "text/css");
-  });
-  svr->Get("/", [](const auto& req, auto& res) {
-    res.set_content(string((const char*)___html_index_html, ___html_index_html_len), "text/html");
-  });
-
+  if(0)
+    svr->set_mount_point("/", "html/");
+  else {
+    svr->Get("/simplomon.ico", [](const auto& req, auto& res) {
+      res.set_content(string((const char*)___html_simplomon_ico, ___html_simplomon_ico_len), "image/x-icon");
+    });
+    svr->Get("/alpine.min.js", [](const auto& req, auto& res) {
+      res.set_content(string((const char*)___html_alpine_min_js, ___html_alpine_min_js_len), "application/javascript");
+    });
+    svr->Get("/logic.js", [](const auto& req, auto& res) {
+      res.set_content(string((const char*)___html_logic_js, ___html_logic_js_len), "application/javascript");
+    });
+    svr->Get("/pico.min.css", [](const auto& req, auto& res) {
+      res.set_content(string((const char*)___html_pico_min_css, ___html_pico_min_css_len), "text/css");
+    });
+    svr->Get("/", [](const auto& req, auto& res) {
+      res.set_content(string((const char*)___html_index_html, ___html_index_html_len), "text/html");
+    });
+  }
   string addr = data.get_or("address", string("0.0.0.0:8080"));
   ComboAddress ca(addr, 8080);
   fmt::print("Going to launch webserver on {}\n", ca.toStringWithPort());
