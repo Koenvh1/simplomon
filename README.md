@@ -16,6 +16,7 @@ Key differences compared to existing systems:
    * SMTP STARTTLS certificate checking, IMAP certificate checking
      * Email delivery test. IMAP check checks if SMTP check
        managed to deliver email to the configured mailbox
+   * Check JSON fields in data returned from URLs
  * "Management mode" - (separate) alerts that only go out if a problem persists
 
 You'd use this if you think "I need to slap some monitoring on this pronto
@@ -112,6 +113,30 @@ https{url="https://berthub.eu", serverIP="2001:41f0:782d::2"}
 https{url="https://berthub.eu", dns={"8.8.8.8"}}
 -- or from a specific source IP
 https{url="https://berthub.eu", dns={"9.9.9.9"}, localIP4="10.0.0.9"}
+
+-- check if JSON matches expectations
+-- simple
+
+https{name="bagconv server", url="https://berthub.eu/pcode/2513AA/14", jsoncheck = "j[1].bouwjaar == 1290"}
+
+-- advanced
+function galcheck(p)
+        if p['total-live-receivers'] > 50
+        then
+                return true
+        else
+                return false, "Not enough receivers"
+        end
+end 
+
+https{name="galmon signal", url="https://galmon.eu/global.json", jsonfunc=galcheck}
+
+function galcurrent(p)
+        return p['last-seen'] > os.time() - 300
+end
+
+https{name="galmon current", url="https://galmon.eu/global.json", jsonfunc=galcurrent}
+
 
 -- Check if SOA records are identical
 nameservers={"100.25.31.6", "86.82.68.237", "217.100.190.174"}
