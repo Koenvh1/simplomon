@@ -348,18 +348,21 @@ CheckResult HTTPSChecker::perform()
 	  
 	}
 	else {
-	  bool funcresult;
+	  std::tuple<bool, std::optional<string>> funcresult;
 	  if(d_jsonfunc.has_value()) {
-	    std::function<bool(sol::table)> f = *d_jsonfunc;
+	    std::function<std::tuple<bool, std::optional<string>> (sol::table)> f = *d_jsonfunc;
 	    funcresult=f(std::get<0>(result));
 	  }
 	  else {
 	    g_lua["j"] = std::get<0>(result);
 	    funcresult = g_lua.script("return " + d_jsoncheck);
 	  }
-	  if(!funcresult) {
-	    cr.d_reasons[subject].push_back(fmt::format("JSON check for '{}' executed unsuccessfully{}",
-							d_url, serverIP));
+	  if(!get<0>(funcresult)) {
+	    string extra;
+	    if(get<1>(funcresult).has_value())
+	      extra =": "+*get<1>(funcresult);
+	    cr.d_reasons[subject].push_back(fmt::format("JSON check for '{}' executed unsuccessfully{}{}",
+							d_url, serverIP, extra));
 
 	  }
 	}
