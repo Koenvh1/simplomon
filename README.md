@@ -144,10 +144,10 @@ dnssoa{domain="berthub.eu", servers= nameservers}
 dnssoa{domain="hubertnet.nl", servers= nameservers}
 
 -- DNSSEC, check if signatures are fresh enough
-rrsig{server="45.55.10.200", name="powerdns.com"}
-rrsig{server="188.166.104.87", name="powerdns.com"}
-rrsig{server="149.20.2.26", name="isc.org", minDays=10}
-rrsig{server="100.25.31.6", name="berthub.eu"}
+rrsig{server="45.55.10.200", domain="powerdns.com"}
+rrsig{server="188.166.104.87", domain="powerdns.com"}
+rrsig{server="149.20.2.26", domain="isc.org", minDays=10}
+rrsig{server="100.25.31.6", domain="berthub.eu"}
 
 -- Check if the following ports are closed
 scaryports={25, 80, 110, 443, 3000, 3306, 5000, 5432, 8000, 8080, 8888}
@@ -156,9 +156,9 @@ tcpportclosed{servers={"100.25.31.6"}, ports=scaryports}
 tcpportopen{servers={"192.0.2.1"}, ports={80}}
 
 -- Check if DNS is serving what it should be
-dns{server="100.25.31.6", name="berthub.eu", type="A",
+dns{server="100.25.31.6", domain="berthub.eu", type="A",
 	acceptable={"86.82.68.237", "217.100.190.174"}}
-dns{server="100.25.31.6", name="berthub.eu", type="AAAA",
+dns{server="100.25.31.6", domain="berthub.eu", type="AAAA",
 	acceptable={"2001:41f0:782d::2"}}
 
 -- Does the http redirect work?
