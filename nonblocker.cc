@@ -132,6 +132,7 @@ catch(std::exception& e)
 {
   fmt::print("Exception: {}\n", e.what());
   d_error = e.what();
+  close(d_proxysock);
 }
 
 void NonBlocker::init()
