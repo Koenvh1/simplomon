@@ -13,6 +13,7 @@
 #include "peglib.h"
 
 extern sol::state g_lua;
+extern std::mutex g_lualock;
 
 void initLua();
 
@@ -43,12 +44,13 @@ public:
       d_minfailures = minFailures;
     d_minfailures = data.get_or("minFailures", d_minfailures);
     d_failurewin =  data.get_or("failureWindow", d_failurewin);
+    d_name = data.get_or("name", std::string());
+    
     d_mute = data.get_or("mute", false);
     data["mute"] = sol::lua_nil;
-    
-    data["subject"] = sol::lua_nil;
-    data["minFailures"] = sol::lua_nil;
-    data["failureWindow"] = sol::lua_nil;
+
+    for(const auto& nil : {"subject", "minFailures", "failureWindow", "name"})
+	  data[nil] = sol::lua_nil;
     // bake in
     //    fmt::print("Baking in {} notifiers\n", g_notifiers.size());
     std::optional<std::vector<std::shared_ptr<Notifier>>> spec = data["notifiers"];
@@ -61,9 +63,6 @@ public:
       data["notifiers"] = sol::lua_nil;
     }
     else notifiers = g_notifiers;
-    
-    //    for(const auto& n : notifiers)
-    //  fmt::print("Adding notifier {}\n", n->getNotifierName());
   }
   Checker(const Checker&) = delete;
   virtual ~Checker() = default;
@@ -78,6 +77,7 @@ public:
   std::map<std::string, std::map<std::string, SQLiteWriter::var_t>> d_results;
   int d_minfailures=1;
   int d_failurewin = 120;
+  std::string d_name;
 
   std::vector<std::shared_ptr<Notifier>> notifiers;
   bool d_mute = false;
@@ -191,6 +191,29 @@ private:
   std::set<int> d_ports;
 };
 
+class TCPPortOpenChecker : public Checker
+{
+public:
+  TCPPortOpenChecker(const std::set<std::string>& servers,
+             const std::set<int>& ports);
+  TCPPortOpenChecker(sol::table data);
+  CheckResult perform() override;
+  std::string getCheckerName() override { return "tcpportopen"; }
+  std::string getDescription() override
+  {
+    std::vector<std::string> servers;
+    for(const auto& s : d_servers) servers.push_back(s.toString());
+    return fmt::format("TCP open check, servers {}, ports {}",
+                       servers, d_ports);
+  }
+
+  
+private:
+  std::set<ComboAddress> d_servers;
+  std::set<int> d_ports;
+};
+
+
 
 class PINGChecker : public Checker
 {
@@ -257,7 +280,8 @@ private:
   std::vector<ComboAddress> d_dns;
   std::string d_regexStr;
   std::regex d_regex;
-
+  std::optional<sol::function> d_jsonfunc;
+  std::string d_jsoncheck;
   std::string d_method;
   std::string d_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36";
 };
@@ -310,7 +334,7 @@ public:
   std::string getCheckerName() override { return "redir"; }
   std::string getDescription() override
   {
-    return fmt::format("HTTP(s) redir check, from {}, to{}",
+    return fmt::format("HTTP(s) redir check, from {}, to {}",
                        d_fromhostpart+d_frompath, d_tourl);
   }
 

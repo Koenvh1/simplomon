@@ -60,18 +60,78 @@ CheckResult TCPPortClosedChecker::perform()
   return cr;
 }
 
+TCPPortOpenChecker::TCPPortOpenChecker(sol::table data) : Checker(data)
+{
+  checkLuaTable(data, {"servers", "ports"});
+  for(const auto& s: data.get<vector<string>>("servers")) {
+    d_servers.insert(ComboAddress(s));
+  }
+  for(int s: data.get<vector<int>>("ports")) {
+    d_ports.insert(s);
+  }
+}
+
+
+CheckResult TCPPortOpenChecker::perform()
+{
+  CheckResult cr;
+  
+  for(const auto& s : d_servers) {
+    for(const auto& p : d_ports) {
+      int ret=-1;
+      ComboAddress rem=s;
+      rem.setPort(p);
+
+      try {
+        Socket sock(s.sin4.sin_family, SOCK_STREAM);
+        SetNonBlocking(sock);
+        //fmt::print("Going to connect to {}\n", rem.toStringWithPort());
+        ret = SConnectWithTimeout(sock, rem, 1);
+      }
+      catch(exception& e) {
+        //        fmt::print("Could not connnect to TCP {}: {}\n",
+        //           rem.toStringWithPort(), e.what());
+	cr.d_reasons[rem.toStringWithPort()].push_back(fmt::format("Unable to connect to TCP {}: {}",
+								   rem.toStringWithPort(), e.what()));
+
+        continue;
+      }
+      catch(...) {
+	cr.d_reasons[rem.toStringWithPort()].push_back(fmt::format("Unable to connect to TCP {}",
+								   rem.toStringWithPort()));
+
+        continue;
+      }
+      if(ret < 0) {
+        cr.d_reasons[rem.toStringWithPort()].push_back(fmt::format("Unable ot connect to TCP {}: ", rem.toStringWithPort(),
+								   strerror(errno)));
+      }
+    }
+  }
+  return cr;
+}
+
 
 // XXX needs switch to select IPv4 or IPv6 or happy eyeballs?
 HTTPSChecker::HTTPSChecker(sol::table data) : Checker(data)
 {
-  checkLuaTable(data, {"url"}, {"maxAgeMinutes", "minBytes", "minCertDays", "serverIP", "method", "localIP4", "localIP6", "dns", "regex"});
+  checkLuaTable(data, {"url"}, {"maxAgeMinutes", "minBytes", "minCertDays", "serverIP",
+				"method", "localIP4", "localIP6", "dns", "regex",
+				"jsonfunc", "jsoncheck"
+    });
   d_url = data.get<string>("url");
   d_maxAgeMinutes =data.get_or("maxAgeMinutes", 0);
   d_minCertDays =  data.get_or("minCertDays", 14);
   string serverip= data.get_or("serverIP", string(""));
   string localip4= data.get_or("localIP4", string(""));
   string localip6= data.get_or("localIP6", string(""));
+  d_jsoncheck = data.get_or("jsoncheck", string(""));
   
+  sol::optional<sol::function> jsonfunc =  data["jsonfunc"];
+  if(jsonfunc != sol::nullopt) {
+    d_jsonfunc = *jsonfunc;
+  }
+
   d_minBytes =     data.get_or("minBytes", 0);
   d_method =       data.get_or("method", string("GET"));
   vector<string> dns = data.get_or("dns", vector<string>());
@@ -213,8 +273,7 @@ CheckResult HTTPSChecker::perform()
       string body = mc.getURL(d_url, d_method == "HEAD", &certinfo,
                               activeServerIP.sin4.sin_family ? &activeServerIP : 0,
                               &li);
-      
-      
+          
       double httpMsec = dt.lapUsec()/1000.0;
       d_results[subject]["http-msec"]= roundDec(httpMsec, 1);
       d_results[subject]["msec"] = roundDec((ipv6 ? dnsMsec6 : dnsMsec4) + httpMsec, 1);
@@ -276,6 +335,40 @@ CheckResult HTTPSChecker::perform()
                                                     d_url, (int)round(days), serverIP));
         return;
       }
+
+      
+      if(d_jsonfunc.has_value() || !d_jsoncheck.empty()) {
+	std::lock_guard<mutex> l(g_lualock);
+	g_lua["body"]=body;
+	std::tuple<sol::table, int, std::optional<string>> result = g_lua.script("return json.decode(body, 1, nil)");
+	if(get<2>(result)) {
+	  cout << "Error: "<<*std::get<2>(result)<<endl;
+	  cr.d_reasons[subject].push_back(fmt::format("JSON check for '{}' failed to run{}",
+						      d_url, serverIP));
+	  
+	}
+	else {
+	  std::tuple<bool, std::optional<string>> funcresult;
+	  if(d_jsonfunc.has_value()) {
+	    std::function<std::tuple<bool, std::optional<string>> (sol::table)> f = *d_jsonfunc;
+	    funcresult=f(std::get<0>(result));
+	  }
+	  else {
+	    g_lua["j"] = std::get<0>(result);
+	    funcresult = g_lua.script("return " + d_jsoncheck);
+	  }
+	  if(!get<0>(funcresult)) {
+	    string extra;
+	    if(get<1>(funcresult).has_value())
+	      extra =": "+*get<1>(funcresult);
+	    cr.d_reasons[subject].push_back(fmt::format("JSON check for '{}' executed unsuccessfully{}{}",
+							d_url, serverIP, extra));
+
+	  }
+	}
+      }
+      else
+	; // cout<<"NO jsonfunc attached!"<<endl;
     }
     catch(exception& e) {
       cr.d_reasons[subject].push_back(e.what() + serverIP);

@@ -67,9 +67,9 @@ catch(...) {
 
 DNSChecker::DNSChecker(sol::table data) : Checker(data, 2)
 {
-  checkLuaTable(data, {"server", "name", "type"}, {"rd", "acceptable", "localIP"});
+  checkLuaTable(data, {"server", "domain", "type"}, {"rd", "acceptable", "localIP"});
   d_nsip = ComboAddress(data.get<string>("server"), 53);
-  d_qname = makeDNSName(data.get<string>("name"));
+  d_qname = makeDNSName(data.get<string>("domain"));
   d_qtype = makeDNSType(data.get<string>("type").c_str());
   for(const auto& a : data.get_or("acceptable", vector<string>()))
     d_acceptable.insert(a);
@@ -81,7 +81,7 @@ DNSChecker::DNSChecker(sol::table data) : Checker(data, 2)
   }
 
   d_attributes["server"] = d_nsip.toStringWithPort();
-  d_attributes["name"] = d_qname.toString();
+  d_attributes["domain"] = d_qname.toString();
   d_attributes["type"] = toString(d_qtype);
   d_attributes["rd"] = d_rd;
 }
@@ -254,14 +254,14 @@ CheckResult DNSSOAChecker::perform()
 // minimum of 2 failures
 RRSIGChecker::RRSIGChecker(sol::table data) : Checker(data, 2)
 {
-  checkLuaTable(data, {"server", "name"}, {"minDays", "type"});
+  checkLuaTable(data, {"server", "domain"}, {"minDays", "type"});
   d_nsip = ComboAddress(data.get<string>("server"), 53);
-  d_qname = makeDNSName(data.get<string>("name"));
+  d_qname = makeDNSName(data.get<string>("domain"));
   d_qtype = makeDNSType(data.get_or("type", string("SOA")).c_str());
   d_minDays = data.get_or("minDays", 7);
 
   d_attributes["server"] = d_nsip.toStringWithPort();
-  d_attributes["name"] = d_qname.toString();
+  d_attributes["domain"] = d_qname.toString();
   d_attributes["type"] = toString(d_qtype);
 
 }
